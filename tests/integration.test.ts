@@ -66,17 +66,37 @@ beforeAll(async () => {
   app = mod.default;
 });
 
-async function fetch(query?: string, bindings?: Partial<Bindings>): Promise<Response> {
-  const path = query ? `/url2pdf?url=${encodeURIComponent(query)}` : "/url2pdf";
-  return await app.request(path, {}, { ...mockBindings(), ...bindings } as Bindings);
+function pdfUrl(url: string): string {
+  return `/url2pdf?url=${encodeURIComponent(url)}`;
 }
+
+async function fetch(path?: string, bindings?: Partial<Bindings>): Promise<Response> {
+  const url = path ?? "/url2pdf";
+  return await app.request(url, {}, { ...mockBindings(), ...bindings } as Bindings);
+}
+
+describe("GET /", () => {
+  test("returns service metadata", async () => {
+    const res = await fetch("/");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toMatch(/application\/json/);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      name: "url2pdf-workflow",
+      endpoints: expect.objectContaining({
+        "/": expect.any(String),
+        "/url2pdf?url=<url>": expect.any(String),
+      }),
+    });
+  });
+});
 
 describe("full request lifecycle", () => {
   test("complete round-trip: cache miss → workflow → processing", async () => {
     const bucket = mockBucket() as unknown as R2Bucket;
     bucket.get = mock(() => Promise.resolve(null));
 
-    const res = await fetch("https://example.com", { BUCKET: bucket });
+    const res = await fetch(pdfUrl("https://example.com"), { BUCKET: bucket });
     expect(res.status).toBe(200);
     expect(await res.text()).toMatch(/Instance wf-integration-test is processing/);
   });
@@ -89,7 +109,7 @@ describe("full request lifecycle", () => {
       }),
     );
 
-    const res = await fetch("https://example.com", { BUCKET: bucket });
+    const res = await fetch(pdfUrl("https://example.com"), { BUCKET: bucket });
     expect(res.status).toBe(200);
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(pdfBytes);
   });
@@ -102,7 +122,7 @@ describe("full request lifecycle", () => {
       create: mock(() => Promise.reject(new Error("already_exists"))),
     };
 
-    const res = await fetch("https://example.com", {
+    const res = await fetch(pdfUrl("https://example.com"), {
       BUCKET: bucket,
       WORKFLOW: workflow,
     });
@@ -114,7 +134,7 @@ describe("full request lifecycle", () => {
     const bucket = mockBucket() as unknown as R2Bucket;
     bucket.get = mock(() => Promise.reject(new Error("bucket not found")));
 
-    const res = await fetch("https://example.com", {
+    const res = await fetch(pdfUrl("https://example.com"), {
       BUCKET: bucket,
     });
     expect(res.status).toBe(500);
@@ -123,27 +143,27 @@ describe("full request lifecycle", () => {
 
 describe("validation edge cases", () => {
   test("empty string url", async () => {
-    const res = await fetch("");
+    const res = await fetch("/url2pdf?url=");
     expect(res.status).toBe(404);
   });
 
   test("url with only whitespace", async () => {
-    const res = await fetch("   ");
+    const res = await fetch("/url2pdf?url=   ");
     expect(res.status).toBe(404);
   });
 
   test("url with special characters", async () => {
-    const res = await fetch("https://example.com/path?q=a b&c=d#frag");
+    const res = await fetch(pdfUrl("https://example.com/path?q=a b&c=d#frag"));
     expect(res.status).toBe(200);
   });
 
   test("https protocol", async () => {
-    const res = await fetch("https://example.com");
+    const res = await fetch(pdfUrl("https://example.com"));
     expect(res.status).toBe(200);
   });
 
   test("http protocol", async () => {
-    const res = await fetch("http://example.com");
+    const res = await fetch(pdfUrl("http://example.com"));
     expect(res.status).toBe(200);
   });
 });
@@ -152,6 +172,13 @@ describe("deployed endpoint", () => {
   const deployedUrl = (Bun as any).env.DEPLOYED_URL;
 
   if (deployedUrl) {
+    test("smoke: returns 200 for root route", async () => {
+      const res = await fetch(`${deployedUrl}/`);
+      expect(res.status).toBe(200);
+      const body = await res.json() as any;
+      expect(body.name).toBe("url2pdf-workflow");
+    });
+
     test("smoke: returns 404 for missing url", async () => {
       const res = await fetch(`${deployedUrl}/url2pdf`);
       expect(res.status).toBe(404);

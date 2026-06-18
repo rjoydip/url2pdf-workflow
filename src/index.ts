@@ -35,6 +35,20 @@ async function startWorkflow(env: Bindings, url: string): Promise<Response> {
 
 const app = new Hono<{ Bindings: Bindings }>();
 
+/** GET / — returns service metadata. */
+app.get("/", (c) => {
+  return c.json({
+    name: "url2pdf-workflow",
+    version: "1.0.0",
+    description: "Convert URLs to PDFs using Cloudflare Browser Rendering",
+    source: "https://github.com/rjoydip/url2pdf-workflow",
+    endpoints: {
+      "/": "Service metadata (this response)",
+      "/url2pdf?url=<url>": "Convert a URL to PDF",
+    },
+  });
+});
+
 /** GET /url2pdf?url=<url> — returns a PDF for the given URL. */
 app.get("/url2pdf", async (c) => {
   const url = c.req.query("url");
