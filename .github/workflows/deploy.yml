@@ -3,10 +3,6 @@ name: Deploy to Cloudflare Workers
 on:
   push:
     branches: [main]
-    paths:
-      - "src/**"
-      - "wrangler.jsonc"
-      - "package.json"
   workflow_dispatch:
 
 permissions:
@@ -25,7 +21,9 @@ jobs:
       - run: bun run test
       - run: bun run lint
       - name: Ensure R2 bucket exists
-        run: bunx wrangler r2 bucket create url2pdf-bucket 2>&1 || grep -q "already exists" || exit 1
+        run: |
+          OUTPUT=$(bunx wrangler r2 bucket create url2pdf-bucket 2>&1) || \
+            echo "$OUTPUT" | grep -q "already exists" || exit 1
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
