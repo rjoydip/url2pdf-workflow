@@ -1,0 +1,29 @@
+"$schema" = "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json"
+
+ignorePatterns = [
+  "**/*.{generated,d}.ts",
+  "**/*.test.ts",
+  "**/dist/**",
+  "**/.{artifacts,opencode}/**",
+]
+ignoreDependencies = []
+dynamicallyLoaded = ["src/**/*.{ts}"]
+
+[rules]
+"unused-files" = "warn"
+"unused-exports" = "warn"
+"unused-types" = "warn"
+"unresolved-imports" = "error"
+"circular-dependency" = "warn"
+
+[duplicates]
+mode = "mild"
+minTokens = 50
+minLines = 5
+threshold = 0
+ignore = ["test/**"]
+
+[health]
+maxCyclomatic = 20
+maxCognitive = 15
+ignore = ["{test,scripts}/**", "**/*.config.{js,ts}"]
