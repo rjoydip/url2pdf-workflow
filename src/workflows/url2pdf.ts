@@ -9,6 +9,13 @@ type PdfResult = {
   capturedAt: string;
 };
 
+/**
+ * Workflow that generates a PDF from a URL using Cloudflare Browser Rendering.
+ *
+ * Steps:
+ * 1. `generate-pdf` — renders the URL via Browser Rendering and stores the PDF in R2.
+ * 2. `verify-stored` — confirms the PDF object exists in the R2 bucket.
+ */
 export class Url2PdfWorkflow extends WorkflowEntrypoint<Bindings> {
   // eslint-disable-next-line no-useless-constructor
   constructor(ctx: any, env: Bindings) {
@@ -36,6 +43,10 @@ export class Url2PdfWorkflow extends WorkflowEntrypoint<Bindings> {
     return result;
   }
 
+  /**
+   * Renders the URL via Browser Rendering and stores the result in R2.
+   * Throws if the browser response is not OK.
+   */
   private async generatePdf(url: string, event: WorkflowEvent<Payload>): Promise<PdfResult> {
     const response = await this.env.BROWSER.quickAction("pdf", { url });
     if (!response.ok) {
@@ -56,6 +67,10 @@ export class Url2PdfWorkflow extends WorkflowEntrypoint<Bindings> {
     };
   }
 
+  /**
+   * Confirms the PDF object exists in R2.
+   * Throws if the object is missing.
+   */
   private async verifyStored(key: string): Promise<void> {
     const head = await this.env.BUCKET.head(key);
     if (!head) {
