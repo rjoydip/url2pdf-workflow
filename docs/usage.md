@@ -13,7 +13,7 @@ bun run dev
 bun run deploy
 ```
 
-Deploy automatically via CI on push/PR to `main` — see [deploy.yml](../.github/workflows/deploy.yml).
+Deploy automatically via CI on push to `main` — see [deploy.yml](../.github/workflows/deploy.yml).
 
 ## Testing
 

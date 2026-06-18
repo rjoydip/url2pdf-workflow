@@ -44,7 +44,7 @@ app.get("/", (c) => {
     source: "https://github.com/rjoydip/url2pdf-workflow",
     endpoints: {
       "/": "Service metadata (this response)",
-      "/url2pdf?url=\u003Curl\u003E": "Convert a URL to PDF",
+      "/url2pdf?url=<url>": "Convert a URL to PDF",
     },
   });
 });
