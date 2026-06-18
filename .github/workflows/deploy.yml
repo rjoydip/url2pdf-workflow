@@ -24,6 +24,11 @@ jobs:
       - run: bun install
       - run: bun run test
       - run: bun run lint
+      - name: Ensure R2 bucket exists
+        run: bunx wrangler r2 bucket create url2pdf-bucket 2>&1 || grep -q "already exists" || exit 1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Deploy
         uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
         with:
