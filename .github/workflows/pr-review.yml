@@ -34,7 +34,11 @@ jobs:
         with:
           submodules: false
 
-      - uses: ./.github/actions/configure-git
+      - name: Configure Git remote URL with token
+        if: github.event_name == 'workflow_dispatch' && inputs.token != ''
+        shell: bash
+        run: |
+          git remote set-url origin https://x-access-token:${{ inputs.token }}@github.com/${{ github.repository }}.git
 
       - name: Run Code Review
         uses: anomalyco/opencode/github@11e47f91496005aab4d7c5a2d0a7da5d2651b4ac # v1.17.8
