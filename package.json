@@ -16,7 +16,7 @@
     "fallow:dead": "fallow dead-code",
     "fallow:dupes": "fallow dupes",
     "fallow:fix": "fallow fix --dry-run",
-    "fallow:health": "fallow health --format badge > .artifacts/fallow-health.svg"
+    "fallow:health": "fallow health --format badge --report-only > .artifacts/fallow-health.svg"
   },
   "dependencies": {
     "hono": "^4.12.26"
