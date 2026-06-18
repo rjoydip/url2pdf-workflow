@@ -175,7 +175,7 @@ describe("deployed endpoint", () => {
     test("smoke: returns 200 for root route", async () => {
       const res = await fetch(`${deployedUrl}/`);
       expect(res.status).toBe(200);
-      const body = await res.json() as any;
+      const body = (await res.json()) as any;
       expect(body.name).toBe("url2pdf-workflow");
     });
 
