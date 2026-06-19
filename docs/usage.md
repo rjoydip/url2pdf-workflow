@@ -17,18 +17,79 @@ Deploy automatically via CI on push to `main` — see [deploy.yml](../.github/wo
 
 ## Testing
 
+### Unit and integration tests
+
 ```sh
 bun run test        # Run all tests
 bun run test:watch  # Watch mode
 ```
 
-Smoke test a deployed instance:
+### Smoke test against a deployed instance
+
+Set `DEPLOYED_URL` to the worker URL and run the integration tests against it:
 
 ```sh
-DEPLOYED_URL=https://url2pdf.your-worker.workers.dev bun test
+DEPLOYED_URL=https://url2pdf.rjoydip.workers.dev bun test
+```
+
+The smoke tests confirm:
+
+- `GET /` returns service metadata (200 + JSON body)
+- `GET /url2pdf` without a URL returns 404
+- `GET /url2pdf?url=<valid>` returns 200 (cached or processing)
+- `GET /url2pdf?url=<invalid>` returns 500
+
+### Manual testing with curl
+
+```sh
+# Check service metadata
+curl https://url2pdf.rjoydip.workers.dev/
+```
+
+```sh
+# Generate a PDF
+curl "https://url2pdf.rjoydip.workers.dev/url2pdf?url=https://example.com" \
+  --output example.pdf
+```
+
+```sh
+# Check for errors on first request (Workflow may still be processing)
+curl -w "\n%{http_code}\n" \
+  "https://url2pdf.rjoydip.workers.dev/url2pdf?url=https://example.com"
+# Response: "Instance <id> is processing" (200)
+# Retry to get the cached PDF:
+curl "https://url2pdf.rjoydip.workers.dev/url2pdf?url=https://example.com" \
+  --output example.pdf
 ```
 
 ## API
+
+### `GET /`
+
+Returns service metadata as JSON.
+
+| Status | Description                   |
+| ------ | ----------------------------- |
+| `200`  | JSON object with service info |
+
+**Example:**
+
+```sh
+curl https://url2pdf.rjoydip.workers.dev/
+```
+
+```json
+{
+  "name": "url2pdf-workflow",
+  "version": "1.0.0",
+  "description": "Convert URLs to PDFs using Cloudflare Browser Rendering",
+  "source": "https://github.com/rjoydip/url2pdf-workflow",
+  "endpoints": {
+    "/": "Service metadata (this response)",
+    "/url2pdf?url=<url>": "Convert a URL to PDF"
+  }
+}
+```
 
 ### `GET /url2pdf?url=<url>`
 
@@ -49,7 +110,8 @@ Converts a URL to PDF.
 ### Example
 
 ```sh
-curl "https://your-worker.example/url2pdf?url=https://example.com" --output example.pdf
+curl "https://url2pdf.rjoydip.workers.dev/url2pdf?url=https://example.com" \
+  --output example.pdf
 ```
 
 ## Caching

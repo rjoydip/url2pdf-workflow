@@ -2,6 +2,10 @@ import { Hono } from "hono";
 import { md5 } from "hono/utils/crypto";
 export { Url2PdfWorkflow } from "./workflows/url2pdf";
 
+/**
+ * Validates and parses a URL string.
+ * Only http and https protocols are accepted.
+ */
 function parseUrl(url: string | undefined): URL | null {
   if (!url) return null;
   const parsed = URL.parse(url);
@@ -9,6 +13,11 @@ function parseUrl(url: string | undefined): URL | null {
   return parsed;
 }
 
+/**
+ * Creates a Workflow instance to generate a PDF for the given URL.
+ * Returns a 200 response immediately; the PDF is available on retry.
+ * Duplicate requests return "Instance already exists" without error.
+ */
 async function startWorkflow(env: Bindings, url: string): Promise<Response> {
   const instance = await env.WORKFLOW.create({
     id: `workflow-${await md5(url)}`,
@@ -26,6 +35,21 @@ async function startWorkflow(env: Bindings, url: string): Promise<Response> {
 
 const app = new Hono<{ Bindings: Bindings }>();
 
+/** GET / — returns service metadata. */
+app.get("/", (c) => {
+  return c.json({
+    name: "url2pdf-workflow",
+    version: "1.0.0",
+    description: "Convert URLs to PDFs using Cloudflare Browser Rendering",
+    source: "https://github.com/rjoydip/url2pdf-workflow",
+    endpoints: {
+      "/": "Service metadata (this response)",
+      "/url2pdf?url=<url>": "Convert a URL to PDF",
+    },
+  });
+});
+
+/** GET /url2pdf?url=<url> — returns a PDF for the given URL. */
 app.get("/url2pdf", async (c) => {
   const url = c.req.query("url");
   const parsed = parseUrl(url);

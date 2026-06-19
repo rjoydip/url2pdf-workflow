@@ -39,6 +39,7 @@ bun run fallow       # Run fallow analysis
 - **Exports**: Default export the Hono app for the Worker entry point.
 - **Formatting**: Use `bun run format` before committing. oxfmt handles all formatting.
 - **No JSX** in this project.
+- **Comments**: Use JSDoc (`/** ... */`) for all functions, methods, classes, and types. Inline comments (`//`) for non-obvious internal logic only. Keep comments concise — explain _why_, not _what_.
 
 ## Workflow
 

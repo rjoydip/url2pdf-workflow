@@ -63,9 +63,29 @@ beforeAll(async () => {
   app = mod.default;
 });
 
-async function fetch(query?: string, bindings?: Partial<Bindings>): Promise<Response> {
-  const path = query ? `/url2pdf?url=${encodeURIComponent(query)}` : "/url2pdf";
-  return await app.request(path, {}, { ...mockBindings(), ...bindings } as Bindings);
+async function fetch(path?: string, bindings?: Partial<Bindings>): Promise<Response> {
+  const url = path ?? "/url2pdf";
+  return await app.request(url, {}, { ...mockBindings(), ...bindings } as Bindings);
+}
+
+describe("GET /", () => {
+  test("returns service metadata", async () => {
+    const res = await fetch("/");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toMatch(/application\/json/);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      name: "url2pdf-workflow",
+      endpoints: expect.objectContaining({
+        "/": expect.any(String),
+        "/url2pdf?url=<url>": expect.any(String),
+      }),
+    });
+  });
+});
+
+function pdfUrl(url: string): string {
+  return `/url2pdf?url=${encodeURIComponent(url)}`;
 }
 
 describe("GET /url2pdf", () => {
@@ -76,12 +96,12 @@ describe("GET /url2pdf", () => {
   });
 
   test("invalid url returns 404", async () => {
-    const res = await fetch("not-a-url");
+    const res = await fetch("/url2pdf?url=not-a-url");
     expect(res.status).toBe(404);
   });
 
   test("unsupported protocol returns 404", async () => {
-    const res = await fetch("ftp://example.com");
+    const res = await fetch("/url2pdf?url=ftp://example.com");
     expect(res.status).toBe(404);
   });
 
@@ -93,7 +113,7 @@ describe("GET /url2pdf", () => {
       }),
     );
 
-    const res = await fetch("https://example.com", { BUCKET: bucket });
+    const res = await fetch(pdfUrl("https://example.com"), { BUCKET: bucket });
     expect(res.status).toBe(200);
     expect(await res.arrayBuffer()).toEqual(new Uint8Array([1, 2, 3]).buffer);
   });
@@ -101,7 +121,7 @@ describe("GET /url2pdf", () => {
   test("creates workflow when url not cached", async () => {
     const create = mock(() => Promise.resolve({ id: "workflow-mock-id" }));
 
-    const res = await fetch("https://example.com", { WORKFLOW: { create } });
+    const res = await fetch(pdfUrl("https://example.com"), { WORKFLOW: { create } });
 
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("Instance workflow-mock-id is processing");
@@ -111,7 +131,7 @@ describe("GET /url2pdf", () => {
   test("returns already exists when workflow throws duplicate", async () => {
     const create = mock(() => Promise.reject(new Error("already_exists")));
 
-    const res = await fetch("https://example.com", { WORKFLOW: { create } });
+    const res = await fetch(pdfUrl("https://example.com"), { WORKFLOW: { create } });
 
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("Instance already exists");
@@ -120,7 +140,7 @@ describe("GET /url2pdf", () => {
   test("re-throws non-duplicate workflow errors", async () => {
     const create = mock(() => Promise.reject(new Error("network error")));
 
-    const res = await fetch("https://example.com", { WORKFLOW: { create } });
+    const res = await fetch(pdfUrl("https://example.com"), { WORKFLOW: { create } });
 
     expect(res.status).toBe(500);
   });
