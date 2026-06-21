@@ -3,7 +3,7 @@
 [![License](https://img.shields.io/github/license/rjoydip/url2pdf-workflow)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0+-blue)](https://www.typescriptlang.org/)
 [![Bun](https://img.shields.io/badge/Bun-1.3+-green)](https://bun.sh)
-[![Fallow Health](.artifacts/fallow-badge.svg)](https://docs.fallow.tools/)
+[![Fallow Health](.artifacts/fallow-health.svg)](https://docs.fallow.tools/)
 [![CI](https://github.com/rjoydip/url2pdf-workflow/actions/workflows/ci.yml/badge.svg)](https://github.com/rjoydip/url2pdf-workflow/actions/workflows/ci.yml)
 
 Convert URLs to PDFs using Cloudflare Browser Rendering.
