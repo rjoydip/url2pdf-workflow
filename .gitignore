@@ -35,4 +35,4 @@ lerna-debug.log*
 # misc
 .DS_Store
 .fallow
-.artifacts/
+coverage/
