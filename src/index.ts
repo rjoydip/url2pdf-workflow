@@ -21,6 +21,20 @@ function parseUrl(url: string | undefined): URL | null {
 }
 
 /**
+ * Normalizes a URL for use as a cache key:
+ * - Strips trailing slash from the pathname (except root "/")
+ * - Sorts query parameters alphabetically
+ * - Preserves hash, auth, etc. as-is
+ */
+function normalizeUrl(url: URL): string {
+  const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/$/, "") : url.pathname;
+  const params = [...url.searchParams.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const qs = params.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
+  const search = qs ? `?${qs}` : "";
+  return `${url.protocol}//${url.host}${pathname}${search}${url.hash}`;
+}
+
+/**
  * Escapes HTML special characters for safe embedding in HTML content.
  */
 function escapeHtml(s: string): string {
@@ -84,7 +98,7 @@ async function ensureWorkflow(env: Bindings, url: string): Promise<void> {
       params: { url },
     });
   } catch (err) {
-    if (!(err instanceof Error && /^already_exists/.test(err.message))) {
+    if (!(err instanceof Error && /^already_exists$/.test(err.message))) {
       throw err;
     }
   }
@@ -116,14 +130,16 @@ app.get("/", async (c) => {
   const parsed = parseUrl(url);
   if (!parsed) return c.text("Bad Request: invalid or missing url parameter", 400);
 
-  const cached = await c.env.BUCKET.get(url);
+  const cacheKey = normalizeUrl(parsed);
+
+  const cached = await c.env.BUCKET.get(cacheKey);
   if (cached) {
     const data = await cached.arrayBuffer();
     return c.body(data, 200, { "content-type": "application/pdf" });
   }
 
-  await ensureWorkflow(c.env, url);
-  return c.html(processingPageHtml(url));
+  await ensureWorkflow(c.env, cacheKey);
+  return c.html(processingPageHtml(cacheKey));
 });
 
 export default app;

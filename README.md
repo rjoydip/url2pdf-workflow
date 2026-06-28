@@ -205,7 +205,7 @@ curl "https://url2pdf.rjoydip.workers.dev/?url=https://example.com" \
 
 ## Caching
 
-Generated PDFs are cached in an R2 bucket using the URL as the key. Subsequent requests for the same URL first check the cache before creating a new Workflow instance.
+Generated PDFs are cached in an R2 bucket using a normalized URL as the key (trailing slashes stripped, query parameters sorted). Subsequent requests for the same URL first check the cache before creating a new Workflow instance.
 
 ## Prerequisites
 

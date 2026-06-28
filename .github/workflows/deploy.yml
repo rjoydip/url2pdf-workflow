@@ -8,7 +8,6 @@ on:
       - "wrangler.jsonc"
       - "package.json"
   pull_request:
-    branches: [main]
     paths:
       - "src/**"
       - "wrangler.jsonc"

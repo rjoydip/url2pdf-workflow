@@ -110,6 +110,11 @@ describe("GET /?url=", () => {
     expect(res.status).toBe(400);
   });
 
+  test("data protocol returns 400", async () => {
+    const res = await fetch("/?url=data:text/html,hi");
+    expect(res.status).toBe(400);
+  });
+
   test("empty url value returns 400", async () => {
     const res = await fetch("/?url=");
     expect(res.status).toBe(400);
