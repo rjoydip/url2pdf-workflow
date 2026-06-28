@@ -29,9 +29,10 @@ function parseUrl(url: string | undefined): URL | null {
  */
 function normalizeUrl(url: URL): string {
   const host = url.hostname.toLowerCase();
-  const port = url.port ? `:${url.port}` : "";
+  const defaultPort = url.protocol === "https:" ? "443" : "80";
+  const port = url.port && url.port !== defaultPort ? `:${url.port}` : "";
   const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/$/, "") : url.pathname;
-  const params = [...url.searchParams.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const params = [...url.searchParams.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   const qs = params.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
   const search = qs ? `?${qs}` : "";
   return `${url.protocol}//${host}${port}${pathname}${search}${url.hash}`;
