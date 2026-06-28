@@ -23,9 +23,10 @@ function parseUrl(url: string | undefined): URL | null {
 /**
  * Normalizes a URL for use as a cache key:
  * - Lowercases the hostname
+ * - Strips default ports (80 for http, 443 for https)
  * - Strips trailing slash from the pathname (except root "/")
  * - Sorts query parameters alphabetically
- * - Preserves hash as-is
+ * - Strips URL fragment (not sent to servers)
  */
 function normalizeUrl(url: URL): string {
   const host = url.hostname.toLowerCase();
@@ -35,7 +36,7 @@ function normalizeUrl(url: URL): string {
   const params = [...url.searchParams.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   const qs = params.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
   const search = qs ? `?${qs}` : "";
-  return `${url.protocol}//${host}${port}${pathname}${search}${url.hash}`;
+  return `${url.protocol}//${host}${port}${pathname}${search}`;
 }
 
 /**

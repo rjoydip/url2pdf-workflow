@@ -260,7 +260,6 @@ Generated PDFs are cached in an R2 bucket using a normalized URL as the key (tra
 │   └── workflows/
 │       ├── ci.yml            # CI pipeline (lint, typecheck, format, test)
 │       ├── deploy.yml        # Deploy to Cloudflare Workers
-│       ├── autofix.yml       # Auto-fix lint issues on PRs
 │       ├── fallow.yml        # Code analysis
 │       └── pinact.yml        # GitHub Actions pin verification
 ├── AGENTS.md             # AI agent instructions
