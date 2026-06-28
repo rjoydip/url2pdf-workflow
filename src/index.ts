@@ -2,8 +2,8 @@ import { Hono } from "hono";
 import { md5 } from "hono/utils/crypto";
 export { Url2PdfWorkflow } from "./workflows/url2pdf";
 
-// 5-minute polling window covers worst-case workflow retries (4 attempts × 1min + backoff ≈ 4.6min)
-const POLL_RETRIES = 150;
+// 6-minute polling window gives comfortable buffer over worst-case workflow retries (~4.6min)
+const POLL_RETRIES = 180;
 const POLL_INTERVAL_MS = 2000;
 
 /**

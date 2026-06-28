@@ -175,6 +175,46 @@ describe("GET /?url=", () => {
     expect(create).toHaveBeenCalled();
   });
 
+  test("default port is stripped from cache key", async () => {
+    const bucket = mockBucket() as unknown as R2Bucket;
+    const getMock = mock(() => Promise.resolve(null));
+    bucket.get = getMock;
+
+    await fetch(pdfUrl("https://example.com:443/path"), { BUCKET: bucket });
+
+    expect(getMock).toHaveBeenCalledWith("https://example.com/path");
+  });
+
+  test("non-default port is preserved in cache key", async () => {
+    const bucket = mockBucket() as unknown as R2Bucket;
+    const getMock = mock(() => Promise.resolve(null));
+    bucket.get = getMock;
+
+    await fetch(pdfUrl("https://example.com:8080/path"), { BUCKET: bucket });
+
+    expect(getMock).toHaveBeenCalledWith("https://example.com:8080/path");
+  });
+
+  test("fragment is stripped from cache key", async () => {
+    const bucket = mockBucket() as unknown as R2Bucket;
+    const getMock = mock(() => Promise.resolve(null));
+    bucket.get = getMock;
+
+    await fetch(pdfUrl("https://example.com/page#section"), { BUCKET: bucket });
+
+    expect(getMock).toHaveBeenCalledWith("https://example.com/page");
+  });
+
+  test("query params are sorted in cache key", async () => {
+    const bucket = mockBucket() as unknown as R2Bucket;
+    const getMock = mock(() => Promise.resolve(null));
+    bucket.get = getMock;
+
+    await fetch(pdfUrl("https://example.com/?b=2&a=1"), { BUCKET: bucket });
+
+    expect(getMock).toHaveBeenCalledWith("https://example.com/?a=1&b=2");
+  });
+
   test("creates workflow when url not cached", async () => {
     const create = mock(() => Promise.resolve({ id: "workflow-mock-id" }));
 
@@ -185,7 +225,7 @@ describe("GET /?url=", () => {
     const body = await res.text();
     expect(body).toContain("Generating PDF...");
     expect(body).toContain("https://example.com");
-    expect(body).toContain("150");
+    expect(body).toContain("180");
     expect(create).toHaveBeenCalled();
   });
 
