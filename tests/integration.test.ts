@@ -67,15 +67,15 @@ beforeAll(async () => {
 });
 
 function pdfUrl(url: string): string {
-  return `/url2pdf?url=${encodeURIComponent(url)}`;
+  return `/?url=${encodeURIComponent(url)}`;
 }
 
 async function request(path?: string, bindings?: Partial<Bindings>): Promise<Response> {
-  const url = path ?? "/url2pdf";
+  const url = path ?? "/";
   return await app.request(url, {}, { ...mockBindings(), ...bindings } as Bindings);
 }
 
-describe("GET /", () => {
+describe("GET / (no url param)", () => {
   test("returns service metadata", async () => {
     const res = await request("/");
     expect(res.status).toBe(200);
@@ -85,7 +85,7 @@ describe("GET /", () => {
       name: "url2pdf-workflow",
       endpoints: expect.objectContaining({
         "/": expect.any(String),
-        "/url2pdf?url=<url>": expect.any(String),
+        "/?url=<url>": expect.any(String),
       }),
     });
   });
@@ -98,10 +98,13 @@ describe("full request lifecycle", () => {
 
     const res = await request(pdfUrl("https://example.com"), { BUCKET: bucket });
     expect(res.status).toBe(200);
-    expect(await res.text()).toMatch(/Instance wf-integration-test is processing/);
+    expect(res.headers.get("content-type")).toMatch(/text\/html/);
+    const body = await res.text();
+    expect(body).toContain("Generating PDF...");
+    expect(body).toContain("https://example.com");
   });
 
-  test("complete round-trip: cache hit returns stored pdf", async () => {
+  test("complete round-trip: cache hit returns stored pdf with headers", async () => {
     const bucket = mockBucket() as unknown as R2Bucket;
     (bucket as any).get = mock(() =>
       Promise.resolve({
@@ -111,10 +114,11 @@ describe("full request lifecycle", () => {
 
     const res = await request(pdfUrl("https://example.com"), { BUCKET: bucket });
     expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/pdf");
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(pdfBytes);
   });
 
-  test("cache miss with duplicate workflow returns already exists", async () => {
+  test("cache miss with duplicate workflow returns processing page", async () => {
     const bucket = mockBucket() as unknown as R2Bucket;
     bucket.get = mock(() => Promise.resolve(null));
 
@@ -127,7 +131,10 @@ describe("full request lifecycle", () => {
       WORKFLOW: workflow,
     });
     expect(res.status).toBe(200);
-    expect(await res.text()).toBe("Instance already exists");
+    expect(res.headers.get("content-type")).toMatch(/text\/html/);
+    const body = await res.text();
+    expect(body).toContain("Generating PDF...");
+    expect(body).toContain("https://example.com");
   });
 
   test("non-existent bucket returns 500", async () => {
@@ -143,13 +150,15 @@ describe("full request lifecycle", () => {
 
 describe("validation edge cases", () => {
   test("empty string url", async () => {
-    const res = await request("/url2pdf?url=");
-    expect(res.status).toBe(404);
+    const res = await request("/?url=");
+    expect(res.status).toBe(400);
+    expect(await res.text()).toMatch(/bad request/i);
   });
 
   test("url with only whitespace", async () => {
-    const res = await request("/url2pdf?url=   ");
-    expect(res.status).toBe(404);
+    const res = await request("/?url=   ");
+    expect(res.status).toBe(400);
+    expect(await res.text()).toMatch(/bad request/i);
   });
 
   test("url with special characters", async () => {
@@ -179,22 +188,17 @@ describe("deployed endpoint", () => {
       expect(body.name).toBe("url2pdf-workflow");
     });
 
-    test("smoke: returns 404 for missing url", async () => {
-      const res = await fetch(`${deployedUrl}/url2pdf`);
-      expect(res.status).toBe(404);
-    });
-
     test("smoke: returns 200 for any valid url regardless of reachability", async () => {
       const res = await fetch(
-        `${deployedUrl}/url2pdf?url=${encodeURIComponent("https://" + Date.now() + ".example.com")}`,
+        `${deployedUrl}/?url=${encodeURIComponent("https://" + Date.now() + ".example.com")}`,
       );
       expect(res.status).toBe(200);
       const text = await res.text();
-      expect(text).toMatch(/^Instance .+ is (processing|already exists)$/);
+      expect(text).toContain("Generating PDF...");
     });
 
-    test("smoke: health check returns 200 for reachable url", async () => {
-      const res = await fetch(`${deployedUrl}/url2pdf?url=https://example.com`);
+    test("smoke: returns 200 for reachable url", async () => {
+      const res = await fetch(`${deployedUrl}/?url=https://example.com`);
       expect(res.ok).toBe(true);
     });
   }
