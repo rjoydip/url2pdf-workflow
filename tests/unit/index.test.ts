@@ -185,7 +185,7 @@ describe("GET /?url=", () => {
     const body = await res.text();
     expect(body).toContain("Generating PDF...");
     expect(body).toContain("https://example.com");
-    expect(body).toContain("30");
+    expect(body).toContain("150");
     expect(create).toHaveBeenCalled();
   });
 
