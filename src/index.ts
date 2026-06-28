@@ -5,7 +5,6 @@ export { Url2PdfWorkflow } from "./workflows/url2pdf";
 const POLL_RETRIES = 30;
 const POLL_INTERVAL_MS = 2000;
 
-
 /**
  * Validates and parses a URL string.
  * Only http and https protocols are accepted.
