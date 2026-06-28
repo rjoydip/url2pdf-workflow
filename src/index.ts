@@ -2,8 +2,8 @@ import { Hono } from "hono";
 import { md5 } from "hono/utils/crypto";
 export { Url2PdfWorkflow } from "./workflows/url2pdf";
 
-// 6-minute polling window gives comfortable buffer over worst-case workflow retries (~4.6min)
-const POLL_RETRIES = 180;
+// 7-minute polling window gives comfortable buffer over worst-case workflow retries (~4.6min)
+const POLL_RETRIES = 210;
 const POLL_INTERVAL_MS = 2000;
 
 /**
@@ -144,11 +144,13 @@ app.get("/", async (c) => {
   const cached = await c.env.BUCKET.get(cacheKey);
   if (cached) {
     const expiresAt = cached.customMetadata?.expiresAt;
-    if (!expiresAt || Date.now() > Number(expiresAt)) {
-      await c.env.BUCKET.delete(cacheKey).catch(() => {});
-    } else {
-      const data = await cached.arrayBuffer();
-      return c.body(data, 200, { "content-type": "application/pdf" });
+    if (expiresAt) {
+      if (Date.now() > Number(expiresAt)) {
+        await c.env.BUCKET.delete(cacheKey).catch(() => {});
+      } else {
+        const data = await cached.arrayBuffer();
+        return c.body(data, 200, { "content-type": "application/pdf" });
+      }
     }
   }
 
