@@ -109,6 +109,7 @@ describe("full request lifecycle", () => {
     (bucket as any).get = mock(() =>
       Promise.resolve({
         arrayBuffer: () => Promise.resolve(pdfBytes.buffer),
+        customMetadata: { expiresAt: String(Date.now() + 86_400_000) },
       }),
     );
 
@@ -135,6 +136,33 @@ describe("full request lifecycle", () => {
     const body = await res.text();
     expect(body).toContain("Generating PDF...");
     expect(body).toContain("https://example.com");
+  });
+
+  test("expired cache falls through to workflow", async () => {
+    const bucket = mockBucket() as unknown as R2Bucket;
+    const del = mock(() => Promise.resolve());
+    bucket.delete = del;
+    (bucket as any).get = mock(() =>
+      Promise.resolve({
+        arrayBuffer: () => Promise.resolve(pdfBytes.buffer),
+        customMetadata: { expiresAt: String(Date.now() - 1) },
+      }),
+    );
+
+    const res = await request(pdfUrl("https://example.com"), { BUCKET: bucket });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toMatch(/text\/html/);
+    expect(del).toHaveBeenCalled();
+  });
+
+  test("host case is normalized for cache key", async () => {
+    const bucket = mockBucket() as unknown as R2Bucket;
+    const getMock = mock(() => Promise.resolve(null));
+    bucket.get = getMock;
+
+    await request(pdfUrl("https://EXAMPLE.com"), { BUCKET: bucket });
+
+    expect(getMock).toHaveBeenCalledWith("https://example.com/");
   });
 
   test("non-existent bucket returns 500", async () => {

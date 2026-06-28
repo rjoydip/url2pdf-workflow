@@ -126,6 +126,7 @@ describe("GET /?url=", () => {
     (bucket as any).get = mock(() =>
       Promise.resolve({
         arrayBuffer: () => Promise.resolve(new Uint8Array([1, 2, 3])),
+        customMetadata: { expiresAt: String(Date.now() + 86_400_000) },
       }),
     );
 
@@ -133,6 +134,45 @@ describe("GET /?url=", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("application/pdf");
     expect(await res.arrayBuffer()).toEqual(new Uint8Array([1, 2, 3]).buffer);
+  });
+
+  test("expired cache falls through to workflow", async () => {
+    const bucket = mockBucket() as unknown as R2Bucket;
+    const del = mock(() => Promise.resolve());
+    bucket.delete = del;
+    (bucket as any).get = mock(() =>
+      Promise.resolve({
+        arrayBuffer: () => Promise.resolve(new Uint8Array([1, 2, 3])),
+        customMetadata: { expiresAt: String(Date.now() - 1) },
+      }),
+    );
+    const create = mock(() => Promise.resolve({ id: "workflow-mock-id" }));
+
+    const res = await fetch(pdfUrl("https://example.com"), {
+      BUCKET: bucket,
+      WORKFLOW: { create },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toMatch(/text\/html/);
+    expect(create).toHaveBeenCalled();
+    expect(del).toHaveBeenCalled();
+  });
+
+  test("host case is normalized for cache key", async () => {
+    const bucket = mockBucket() as unknown as R2Bucket;
+    const getMock = mock(() => Promise.resolve(null));
+    bucket.get = getMock;
+    const create = mock(() => Promise.resolve({ id: "workflow-mock-id" }));
+
+    await fetch(pdfUrl("https://EXAMPLE.com"), {
+      BUCKET: bucket,
+      WORKFLOW: { create },
+    });
+
+    // The cache key should be lowercased: https://example.com/
+    expect(getMock).toHaveBeenCalledWith("https://example.com/");
+    expect(create).toHaveBeenCalled();
   });
 
   test("creates workflow when url not cached", async () => {
