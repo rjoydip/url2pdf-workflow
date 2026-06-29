@@ -19,7 +19,7 @@ jobs:
       pull-requests: write
 
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
 
@@ -30,7 +30,7 @@ jobs:
       - run: bun install
 
       - name: Run Fallow analysis
-        uses: fallow-rs/fallow@592deffc4a140d7d731ac43abf86975dbdd3ad60 # v2.98.0
+        uses: fallow-rs/fallow@ac68a1a4e99d9ee38ff9198c519f438d172358d2 # v2.103.0
         with:
           format: sarif
           comment: true

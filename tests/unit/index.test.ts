@@ -64,11 +64,11 @@ beforeAll(async () => {
 });
 
 async function fetch(path?: string, bindings?: Partial<Bindings>): Promise<Response> {
-  const url = path ?? "/url2pdf";
+  const url = path ?? "/";
   return await app.request(url, {}, { ...mockBindings(), ...bindings } as Bindings);
 }
 
-describe("GET /", () => {
+describe("GET / (no url param)", () => {
   test("returns service metadata", async () => {
     const res = await fetch("/");
     expect(res.status).toBe(200);
@@ -78,44 +78,141 @@ describe("GET /", () => {
       name: "url2pdf-workflow",
       endpoints: expect.objectContaining({
         "/": expect.any(String),
-        "/url2pdf?url=<url>": expect.any(String),
+        "/?url=<url>": expect.any(String),
       }),
     });
   });
 });
 
 function pdfUrl(url: string): string {
-  return `/url2pdf?url=${encodeURIComponent(url)}`;
+  return `/?url=${encodeURIComponent(url)}`;
 }
 
-describe("GET /url2pdf", () => {
-  test("missing url returns 404", async () => {
+describe("GET /?url=", () => {
+  test("no url param returns metadata", async () => {
     const res = await fetch();
-    expect(res.status).toBe(404);
-    expect(await res.text()).toBe("Not Found");
+    expect(res.status).toBe(200);
   });
 
-  test("invalid url returns 404", async () => {
-    const res = await fetch("/url2pdf?url=not-a-url");
-    expect(res.status).toBe(404);
+  test("invalid url returns 400", async () => {
+    const res = await fetch("/?url=not-a-url");
+    expect(res.status).toBe(400);
+    expect(await res.text()).toMatch(/bad request/i);
   });
 
-  test("unsupported protocol returns 404", async () => {
-    const res = await fetch("/url2pdf?url=ftp://example.com");
-    expect(res.status).toBe(404);
+  test("unsupported protocol returns 400", async () => {
+    const res = await fetch("/?url=ftp://example.com");
+    expect(res.status).toBe(400);
   });
 
-  test("returns cached pdf when bucket has it", async () => {
+  test("javascript protocol returns 400", async () => {
+    const res = await fetch("/?url=javascript:alert(1)");
+    expect(res.status).toBe(400);
+  });
+
+  test("data protocol returns 400", async () => {
+    const res = await fetch("/?url=data:text/html,hi");
+    expect(res.status).toBe(400);
+  });
+
+  test("empty url value returns 400", async () => {
+    const res = await fetch("/?url=");
+    expect(res.status).toBe(400);
+    expect(await res.text()).toMatch(/bad request/i);
+  });
+
+  test("returns cached pdf with content-type header", async () => {
     const bucket = mockBucket() as unknown as R2Bucket;
     (bucket as any).get = mock(() =>
       Promise.resolve({
         arrayBuffer: () => Promise.resolve(new Uint8Array([1, 2, 3])),
+        customMetadata: { expiresAt: String(Date.now() + 86_400_000) },
       }),
     );
 
     const res = await fetch(pdfUrl("https://example.com"), { BUCKET: bucket });
     expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/pdf");
     expect(await res.arrayBuffer()).toEqual(new Uint8Array([1, 2, 3]).buffer);
+  });
+
+  test("expired cache falls through to workflow", async () => {
+    const bucket = mockBucket() as unknown as R2Bucket;
+    const del = mock(() => Promise.resolve());
+    bucket.delete = del;
+    (bucket as any).get = mock(() =>
+      Promise.resolve({
+        arrayBuffer: () => Promise.resolve(new Uint8Array([1, 2, 3])),
+        customMetadata: { expiresAt: String(Date.now() - 1) },
+      }),
+    );
+    const create = mock(() => Promise.resolve({ id: "workflow-mock-id" }));
+
+    const res = await fetch(pdfUrl("https://example.com"), {
+      BUCKET: bucket,
+      WORKFLOW: { create },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toMatch(/text\/html/);
+    expect(create).toHaveBeenCalled();
+    expect(del).toHaveBeenCalled();
+  });
+
+  test("host case is normalized for cache key", async () => {
+    const bucket = mockBucket() as unknown as R2Bucket;
+    const getMock = mock(() => Promise.resolve(null));
+    bucket.get = getMock;
+    const create = mock(() => Promise.resolve({ id: "workflow-mock-id" }));
+
+    await fetch(pdfUrl("https://EXAMPLE.com"), {
+      BUCKET: bucket,
+      WORKFLOW: { create },
+    });
+
+    // The cache key should be lowercased: https://example.com/
+    expect(getMock).toHaveBeenCalledWith("https://example.com/");
+    expect(create).toHaveBeenCalled();
+  });
+
+  test("default port is stripped from cache key", async () => {
+    const bucket = mockBucket() as unknown as R2Bucket;
+    const getMock = mock(() => Promise.resolve(null));
+    bucket.get = getMock;
+
+    await fetch(pdfUrl("https://example.com:443/path"), { BUCKET: bucket });
+
+    expect(getMock).toHaveBeenCalledWith("https://example.com/path");
+  });
+
+  test("non-default port is preserved in cache key", async () => {
+    const bucket = mockBucket() as unknown as R2Bucket;
+    const getMock = mock(() => Promise.resolve(null));
+    bucket.get = getMock;
+
+    await fetch(pdfUrl("https://example.com:8080/path"), { BUCKET: bucket });
+
+    expect(getMock).toHaveBeenCalledWith("https://example.com:8080/path");
+  });
+
+  test("fragment is stripped from cache key", async () => {
+    const bucket = mockBucket() as unknown as R2Bucket;
+    const getMock = mock(() => Promise.resolve(null));
+    bucket.get = getMock;
+
+    await fetch(pdfUrl("https://example.com/page#section"), { BUCKET: bucket });
+
+    expect(getMock).toHaveBeenCalledWith("https://example.com/page");
+  });
+
+  test("query params are sorted in cache key", async () => {
+    const bucket = mockBucket() as unknown as R2Bucket;
+    const getMock = mock(() => Promise.resolve(null));
+    bucket.get = getMock;
+
+    await fetch(pdfUrl("https://example.com/?b=2&a=1"), { BUCKET: bucket });
+
+    expect(getMock).toHaveBeenCalledWith("https://example.com/?a=1&b=2");
   });
 
   test("creates workflow when url not cached", async () => {
@@ -124,7 +221,11 @@ describe("GET /url2pdf", () => {
     const res = await fetch(pdfUrl("https://example.com"), { WORKFLOW: { create } });
 
     expect(res.status).toBe(200);
-    expect(await res.text()).toBe("Instance workflow-mock-id is processing");
+    expect(res.headers.get("content-type")).toMatch(/text\/html/);
+    const body = await res.text();
+    expect(body).toContain("Generating PDF...");
+    expect(body).toContain("https://example.com");
+    expect(body).toContain("210");
     expect(create).toHaveBeenCalled();
   });
 
@@ -134,7 +235,10 @@ describe("GET /url2pdf", () => {
     const res = await fetch(pdfUrl("https://example.com"), { WORKFLOW: { create } });
 
     expect(res.status).toBe(200);
-    expect(await res.text()).toBe("Instance already exists");
+    expect(res.headers.get("content-type")).toMatch(/text\/html/);
+    const body = await res.text();
+    expect(body).toContain("Generating PDF...");
+    expect(body).toContain("https://example.com");
   });
 
   test("re-throws non-duplicate workflow errors", async () => {

@@ -55,8 +55,10 @@ export class Url2PdfWorkflow extends WorkflowEntrypoint<Bindings> {
 
     const data = await response.arrayBuffer();
     const contentType = response.headers.get("content-type") ?? "application/pdf";
+    const expiresAt = String(Date.now() + 86_400_000); // 24 hours TTL
     const object = await this.env.BUCKET.put(url, data, {
       httpMetadata: { contentType },
+      customMetadata: { expiresAt },
     });
 
     return {
